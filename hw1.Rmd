@@ -1,0 +1,238 @@
+---
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+#Problem1
+#(a)
+The purpose of the data collection is to investigate the relationship between daily mood traits and the usage of smartphone. Informed by Beierle et al. (2020), I hypothesize that specific mood traits, such as levels of extraversion or neuroticism, may correlate with the frequency and duration of smartphone use.
+
+#(b)
+The Informed Consent From (ICF) have several roles. First, it informs the participants about the purpose, expectation, steps, and time of duration of the study. It informs participants understanding of their roles and discloses any potential risks. It also informs participants about whether any benefits they could gained. Meanwhile, it protects participants their autonomy so that they can make their own decision about whether getting involved or not. Moreover, it explains how the data would be collected from participants, and how those data would be used and protected. Besides, the ICF emphasizes that the participation in the study is voluntary, and informs participants are free to withdraw from the study at any time without reasons with no penalty. It provides the contact information of the relevant researchers. Additionally, the ICF serves as a legal instrument to make sure that the study complies with ethical standards and legal requirements.
+
+#(c)
+The data was collected from Jan. 3rd to Jan. 26th, 2024, collected from my own cell phone. Six variables are involved, including total screen time in HH-MM format (Total.ST), total screen time in minute (Total.ST.min), social app screen time in HH-MM format (Social.ST), social screen time in minute (Social.ST.min), total number of times that I picked up the phone (Pickups), and the time of the first pickup (Pickup.1st).Therefore, the dataset initially includes six variables and 24 observations (denoted as date) before the data freeze.
+#(d)
+
+#Problem2
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(readr)
+screen_data = read_csv("~/Desktop/2024Spring/BIOSTAT620/BIOSTAT 620 Screen Data.csv")
+hm_to_min <- function(hm) {
+  unlist(lapply(hm, function(x) {
+    splt <- strsplit(x, "h")[[1]]
+    hr <- as.numeric(splt[1])
+    mn <- as.numeric(strsplit(splt[2], "m")[[1]][1])
+    return(60 * hr + mn)
+  }))
+}
+
+screen_data <- screen_data %>%
+  mutate(
+    Total.ST.min.true = hm_to_min(Total.ST),
+    Social.ST.min.true = hm_to_min(Social.ST),
+    Total.ST.match = Total.ST.min.true == Total.ST.min,
+    Social.ST.match = Social.ST.min.true == Social.ST.min
+  ) %>%
+  relocate(
+    Date,
+    Total.ST,
+    Total.ST.min,
+    Total.ST.min.true,
+    Total.ST.match,
+    Social.ST,
+    Social.ST.min,
+    Social.ST.min.true,
+    Social.ST.match
+  )
+screen_data$Date <- as.Date(screen_data$Date, format = "%m/%d/%Y")
+screen_data$weekday = weekdays(screen_data$Date , abbreviate = T)
+screen_data = screen_data %>% mutate(if_weekend = weekday %in% c('Sun', 'Sat'))
+```
+
+#(a)
+```{r}
+par(mfrow = c(3, 2))
+total = ggplot(screen_data, aes(x=Date, y=Total.ST.min.true, color=if_weekend)) +
+  geom_line(color="steelblue") +
+  geom_point() +
+  xlab("") + ylab("Total Screen Time (min)") +
+  ggtitle("Daily Total Screen Time")+
+  ylim(200, 800) +
+  scale_color_manual(labels=c("weekdays", "weekends"), values=c("black", "red")) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.title=element_blank())
+
+social = ggplot(screen_data, aes(x=Date, y=Social.ST.min.true, color=if_weekend)) +
+  geom_line(color="steelblue") +
+  geom_point() +
+  xlab("") + ylab("Social Screen Time (min)") +
+  ggtitle("Daily Social Screen Time")+
+  ylim(60, 400) +
+  scale_color_manual(labels=c("weekdays", "weekends"), values=c("black", "red")) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.title=element_blank())
+
+pickups = ggplot(screen_data, aes(x=Date, y=Pickups, color=if_weekend)) +
+  geom_line(color="steelblue") +
+  geom_point() +
+  xlab("") + ylab("Total Number of Pickups") +
+  ggtitle("Daily Phone Pickups")+
+  ylim(60, 250) +
+  scale_color_manual(labels=c("weekdays", "weekends"), values=c("black", "red")) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.title=element_blank())
+
+proportion = ggplot(screen_data, aes(x=Date, y=Proportion.Social.ST, color=if_weekend)) +
+  geom_line(color="steelblue") +
+  geom_point() +
+  xlab("") + ylab("Proportion") +
+  ggtitle("Daily Proportion of Social Screen Time")+
+  ylim(0, 1) +
+  scale_color_manual(labels=c("weekdays", "weekends"), values=c("black", "red")) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.title=element_blank())
+
+duration = ggplot(screen_data, aes(x=Date, y=Duration.Per.Use, color=if_weekend)) +
+  geom_line(color="steelblue") +
+  geom_point() +
+  xlab("") + ylab("Duration Per Use") +
+  ggtitle("Daily Duration Per Use")+
+  ylim(0, 12) +
+  scale_color_manual(labels=c("weekdays", "weekends"), values=c("black", "red")) +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.title=element_blank())
+```
+
+#(b)
+```{r}
+library(GGally)
+ggpairs(screen_data, columns=c("Total.ST.min.true", "Social.ST.min.true", "Pickups", "Proportion.Social.ST", "Duration.Per.Use"),
+        columnLabels=c("Total Screen Time", "Social Screen Time", "Total Pickups", "Proportion of Social Screen Time", "Duration Per Us")) +
+  theme_bw()
+```
+
+#(c)
+```{r}
+par(mfrow = c(3, 2))
+calculate_occupation_prob <- function(data_column, thresholds) {
+  sapply(thresholds, function(x) mean(data_column >= x))
+}
+
+thresholds1 = seq(200, 800, by = 1)
+occupation_prob1 <- calculate_occupation_prob(screen_data$Total.ST.min.true, thresholds1)
+plot(thresholds1, occupation_prob1, type = "s", xlab = "Minutes", ylab = "Occupation Probability",
+     main = "Daily Total Screen Time Occupation-Time Curve", xlim = c(min(thresholds1), max(thresholds1)), ylim = c(0, 1), xaxs = "i")
+
+thresholds2 = seq(60, 400, by = 1)
+occupation_prob2 <- calculate_occupation_prob(screen_data$Social.ST.min.true, thresholds2)
+plot(thresholds2, occupation_prob2, type = "s", xlab = "Minutes", ylab = "Occupation Probability",
+     main = "Daily Social Screen Time Occupation-Time Curve", xlim = c(min(thresholds2), max(thresholds2)), ylim = c(0, 1), xaxs = "i")
+
+thresholds3 = seq(60, 250, by = 1)
+occupation_prob3 <- calculate_occupation_prob(screen_data$Pickups, thresholds3)
+plot(thresholds3, occupation_prob3, type = "s", xlab = "Minutes", ylab = "Occupation Probability",
+     main = "Daily Phone Pickups Occupation-Time Curve", xlim = c(min(thresholds3), max(thresholds3)), ylim = c(0, 1), xaxs = "i")
+
+thresholds4 = seq(0, 1, by = 0.05)
+occupation_prob4 <- calculate_occupation_prob(screen_data$Proportion.Social.ST, thresholds4)
+plot(thresholds4, occupation_prob4, type = "s", xlab = "Minutes", ylab = "Occupation Probability",
+     main = "Daily Proportion of Social Screen Time Occupation-Time Curve", xlim = c(min(thresholds4), max(thresholds4)), ylim = c(0, 1), xaxs = "i")
+
+thresholds5 = seq(0, 12, by = 1)
+occupation_prob5 <- calculate_occupation_prob(screen_data$Duration.Per.Use, thresholds5)
+plot(thresholds5, occupation_prob5, type = "s", xlab = "Minutes", ylab = "Occupation Probability",
+     main = "Daily Duration Per Use Occupation-Time Curve", xlim = c(min(thresholds5), max(thresholds5)), ylim = c(0, 1), xaxs = "i")
+
+```
+
+#(d)
+```{r}
+library(forecast)
+par(mfrow = c(3, 2))
+acf_1 = acf(screen_data$Total.ST.min.true, plot = TRUE, main="ACF of Daily Total Screen Time")
+print(acf_1)
+acf_2 = acf(screen_data$Social.ST.min.true, plot = TRUE, main="ACF of Daily Total Social Screen Time")
+print(acf_2)
+acf_3 = acf(screen_data$Pickups, plot = TRUE, main="ACF of Daily Number of Pickups")
+print(acf_3)
+acf_4 = acf(screen_data$Proportion.Social.ST, plot = TRUE, main="ACF of Daily Proportion of Social Screen Time")
+print(acf_4)
+acf_5 = acf(screen_data$Duration.Per.Use, plot = TRUE, main="ACF of Daily Duration Per Use")
+print(acf_5)
+```
+
+#Problem 3
+
+```{r}
+library(circular)
+#(a)
+screen_data <- screen_data %>%
+  mutate(Pickup.1st.angular = (hour(Pickup.1st) * 60 + minute(Pickup.1st)) / (24 * 60) * 360)
+#(b)
+first.pickup.cir = circular(screen_data$Pickup.1st.angular, units="degrees", template="clock24")
+plot(first.pickup.cir, col="orange")
+#(c)
+plot(first.pickup.cir, stack=TRUE, bins=48, col="orange")
+```
+
+#Problem 4
+#(a)
+The daily total screen time St is included in this Poisson model to represent the proportional relationship between the duration of screen use and the expected time of pickups. An increase in the time of using phones leads to a higher likelihood of more times of pickups. 
+
+#(b)
+```{r}
+screen_data$Total.ST.hours <- screen_data$Total.ST.min.true / 60
+model <- glm(Pickups ~ offset(log(Total.ST.hours)), family = poisson(link = "log"), data = screen_data)
+summary(model)
+```
+
+#(c)
+```{r}
+screen_data$Xt <- ifelse(screen_data$if_weekend == FALSE, 1, 0)
+screen_data$Zt <- ifelse(screen_data$Date >= as.Date("2024-01-10"), 1, 0)
+model_c <- glm(Pickups ~ Xt + Zt + offset(log(Total.ST.hours)), family = poisson(link = "log"), data = screen_data)
+summary(model_c)
+```
+(1)
+There is significant evidence at the α = 0.05 level that the behavior of daily pickups is different between weekdays and weekends.
+(2)
+There is significant evidence at the α = 0.05 level that the behavior of daily pickups changed after the start of the winter semester.
+
+However, there is a special situation on me. My flight from China back to Detroit was initially Jan.14th, 2024. But I got a terrible fever the day before my original flight (although I found that this flight was also cancelled due to the snow of Michigan), so I have to change my flight to Jan.19st. Therefore, I also tried the same steps with setting Jan.19th as my changing point of winter semester.
+```{r}
+screen_data$Xt <- ifelse(screen_data$if_weekend == FALSE, 1, 0)
+screen_data$Zt <- ifelse(screen_data$Date >= as.Date("2024-01-19"), 1, 0)
+model_c <- glm(Pickups ~ Xt + Zt + offset(log(Total.ST.hours)), family = poisson(link = "log"), data = screen_data)
+summary(model_c)
+```
+(1)
+There is significant evidence at the α = 0.05 level that the behavior of daily pickups is different between weekdays and weekends.
+(2)
+There is significant evidence at the α = 0.05 level that the behavior of daily pickups changed after the start of the winter semester.
+
+#Problem 5
+#(a)
+```{r}
+print(mle.vonmises(screen_data$Pickups))
+screen_data$Pickup.1st.radians <- with(screen_data, Pickup.1st.angular * (pi / 180))
+first_pickups_circular <- circular(screen_data$Pickup.1st.radians, units = "radians", template = "none")
+estimate = mle.vonmises(first_pickups_circular)
+print(estimate)
+```
+
+#(b)
+```{r}
+T830am <- (8.5 / 24) * 2 * pi
+cum_prob = pvonmises(T830am, estimate$mu, estimate$kappa)
+prob_830am_or_later = 1 - cum_prob
+print(prob_830am_or_later)
+```
+
+
+
